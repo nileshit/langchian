@@ -1,4 +1,5 @@
 import os
+from typing import List
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -6,32 +7,30 @@ from langchain.agents import create_agent
 from langchain.tools import tool
 from langchain_core.messages import HumanMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
-from tavily import TavilyClient
+from pydantic import BaseModel,Field
+from langchain_tavily import TavilySearch
 
-tavily = TavilyClient()
-@tool
-def search(query: str) -> str:
-    '''
-    Search the web for real-time information based on a query.
+class Source(BaseModel):
+    """Schema for a source used by the agent"""
+    url:str = Field(description="The URL of the source")
 
-    Args:
-        query (str): The specific search term or question to look up.
+class AgentResponse(BaseModel):
+    """Schema for agent response with answer and sources"""
 
-    Returns:
-        str: A summary of search results or the raw text from the top result.
-   '''
-    print(f"Searching for {query}")
-    return tavily.search(query=query)
+    answer: str = Field(description="Thr agent's answer to the query")
+    sources: List[Source] = Field(
+    ..., description="List of sources used to generate the answer"
+    )
 
 llm = ChatGoogleGenerativeAI( model="gemini-2.5-flash",
     temperature=0.25)
-tools = [search]
-agent = create_agent(model=llm,tools=tools)
+tools = [TavilySearch()]
+agent = create_agent(model=llm,tools=tools,response_format=AgentResponse)
 
 
 def main():
     print("Hello from langchian!")
-    result = agent.invoke({"messages":HumanMessage(content="three job postings for an AI engineer in Langchain in the Maharastra area in LinkedIn")})
+    result = agent.invoke({"messages":HumanMessage(content="search for 3 job postings for an ai engineer using langchain in the bay area on linkedin and list their details?")})
     print(result)
 if __name__ == "__main__":
     main()
